@@ -33,6 +33,8 @@ defmodule Jel do
       ">=" -> {:ok, Enum.at(args, 0) >= Enum.at(args, 1)}
       "<" -> {:ok, Enum.at(args, 0) < Enum.at(args, 1)}
       "<=" -> {:ok, Enum.at(args, 0) <= Enum.at(args, 1)}
+      "!" -> {:ok, !Enum.at(args, 0)}
+      "<>" -> {:ok, Enum.join(args, "")}
       _ -> {:error, "invalid operator"}
     end
   end

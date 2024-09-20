@@ -126,6 +126,20 @@ defmodule JelOperatorTest do
     assert result_lt == true
   end
 
+  test "handles `!` operator" do
+    {:ok, result} = Jel.eval(~s({"!": [ true ] }))
+
+    assert result == false
+  end
+
+  test "handles `<>` operator" do
+    {:ok, result_str} = Jel.eval(~s({"<>": [ "Hello", ", ", "World", "!" ] }))
+    {:ok, result_int} = Jel.eval(~s({"<>": [ 1, 2, 3, 4 ] }))
+
+    assert result_int == "1234"
+    assert result_str == "Hello, World!"
+  end
+
   test "handles invalid json" do
     {:error, error} = Jel.eval(~s({"!: [ true ] }))
 
