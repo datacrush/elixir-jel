@@ -1,4 +1,4 @@
-defmodule JelTest do
+defmodule JelOperatorTest do
   use ExUnit.Case
   doctest Jel
 
