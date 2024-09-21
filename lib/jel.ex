@@ -5,15 +5,50 @@ defmodule Jel do
   See `JelOperatorTest` for an example of a Jel expression.
   """
 
-  def eval(json) do
+  defp commands do
+    %{
+      "+" => fn args -> {:ok, Enum.sum(args)} end,
+      "-" => fn args -> {:ok, Enum.reduce(args, fn x, acc -> acc - x end)} end,
+      "*" => fn args -> {:ok, Enum.reduce(args, fn x, acc -> acc * x end)} end,
+      "/" => fn args -> {:ok, Enum.reduce(args, fn x, acc -> div(acc, x) end)} end,
+      "==" => fn [left, right] -> {:ok, left == right} end,
+      "!=" => fn [left, right] -> {:ok, left != right} end,
+      "&&" => fn args -> {:ok, Enum.all?(args)} end,
+      "||" => fn args -> {:ok, Enum.any?(args)} end,
+      "!" => fn args -> {:ok, !Enum.at(args, 0)} end,
+      ">" => fn [left, right] -> {:ok, left > right} end,
+      ">=" => fn [left, right] -> {:ok, left >= right} end,
+      "<" => fn [left, right] -> {:ok, left < right} end,
+      "<=" => fn [left, right] -> {:ok, left <= right} end,
+      "<>" => fn args -> {:ok, Enum.join(args, "")} end,
+      "get" => fn [pid_string, key] ->
+        pid = pid_string |> String.to_charlist() |> :erlang.list_to_pid()
+        {:ok, GenServer.call(pid, {:get, key})}
+      end,
+      "set" => fn [pid_string, key, value] ->
+        pid = pid_string |> String.to_charlist() |> :erlang.list_to_pid()
+        {:ok, GenServer.cast(pid, {:set, key, value})}
+      end
+    }
+  end
+
+  def parse_command(json) do
     case Jason.decode(json) do
       {:ok, command} ->
-        [{operator, args}] = Map.to_list(command)
-
-        Jel.eval(operator, args)
+        {:ok, Map.to_list(command) |> Enum.at(0)}
 
       {:error, _} ->
         {:error, "Invalid JSON"}
+    end
+  end
+
+  def eval(json) do
+    case parse_command(json) do
+      {:ok, {operator, args}} ->
+        Jel.eval(operator, args)
+
+      {:error, error} ->
+        {:error, error}
     end
   end
 
@@ -22,60 +57,11 @@ defmodule Jel do
   end
 
   defp dispatch(operator, args) do
-    case operator do
-      "+" ->
-        {:ok, Enum.sum(args)}
+    case Map.fetch(commands(), operator) do
+      {:ok, func} ->
+        func.(args)
 
-      "-" ->
-        {:ok, Enum.reduce(args, fn x, acc -> acc - x end)}
-
-      "*" ->
-        {:ok, Enum.reduce(args, fn x, acc -> acc * x end)}
-
-      "/" ->
-        {:ok, Enum.reduce(args, fn x, acc -> div(acc, x) end)}
-
-      "==" ->
-        {:ok, Enum.at(args, 0) == Enum.at(args, 1)}
-
-      "!=" ->
-        {:ok, Enum.at(args, 0) != Enum.at(args, 1)}
-
-      "&&" ->
-        {:ok, Enum.all?(args, fn x -> x end)}
-
-      "||" ->
-        {:ok, Enum.any?(args, fn x -> x end)}
-
-      ">" ->
-        {:ok, Enum.at(args, 0) > Enum.at(args, 1)}
-
-      ">=" ->
-        {:ok, Enum.at(args, 0) >= Enum.at(args, 1)}
-
-      "<" ->
-        {:ok, Enum.at(args, 0) < Enum.at(args, 1)}
-
-      "<=" ->
-        {:ok, Enum.at(args, 0) <= Enum.at(args, 1)}
-
-      "!" ->
-        {:ok, !Enum.at(args, 0)}
-
-      "<>" ->
-        {:ok, Enum.join(args, "")}
-
-      "get" ->
-        pid_string = Enum.at(args, 0)
-        pid = pid_string |> String.to_charlist() |> :erlang.list_to_pid()
-        {:ok, GenServer.call(pid, {:get, Enum.at(args, 1)})}
-
-      "set" ->
-        pid_string = Enum.at(args, 0)
-        pid = pid_string |> String.to_charlist() |> :erlang.list_to_pid()
-        {:ok, GenServer.cast(pid, {:set, Enum.at(args, 1), Enum.at(args, 2)})}
-
-      _ ->
+      :error ->
         {:error, "invalid operator"}
     end
   end
@@ -84,8 +70,8 @@ defmodule Jel do
     Enum.map(args, fn arg ->
       case arg do
         x when is_struct(x) ->
-          [{operator, args}] = Map.to_list(x)
-          Jel.eval(operator, args)
+          {operator, args} = Map.to_list(x) |> Enum.at(0)
+          eval(operator, args)
 
         _ ->
           arg
