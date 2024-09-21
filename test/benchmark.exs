@@ -1,7 +1,17 @@
-med_array = 1..1_000 |> Enum.to_list() |> Jason.encode!()
-large_array = 1..10_000 |> Enum.to_list() |> Jason.encode!()
+array_1 = 1..100 |> Enum.to_list()
+array_10 = 1..1_000 |> Enum.to_list()
+array_100 = 1..10_000 |> Enum.to_list()
 
-large_data = ~s({">": [ { "+": #{large_array} }, { "*": #{med_array}  } ] })
+nested = [%{"-" => array_1} | array_10]
+
+large_data = "
+{
+  \">\": [
+    { \"+\": #{array_100 |> Jason.encode!()} },
+    { \"*\": #{nested |> Jason.encode!()} }
+  ]
+}
+"
 
 Benchee.run(
   %{
