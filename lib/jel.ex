@@ -1,35 +1,12 @@
 defmodule Jel do
-  @moduledoc """
-  Documentation for `Jel`.
+  use Agent
 
-  See `JelOperatorTest` for an example of a Jel expression.
-  """
+  def start_link(address) do
+    Agent.start_link(fn -> address end, name: __MODULE__)
+  end
 
-  defp commands do
-    %{
-      "+" => fn args -> {:ok, Enum.sum(args)} end,
-      "-" => fn args -> {:ok, Enum.reduce(args, fn x, acc -> acc - x end)} end,
-      "*" => fn args -> {:ok, Enum.reduce(args, fn x, acc -> acc * x end)} end,
-      "/" => fn args -> {:ok, Enum.reduce(args, fn x, acc -> div(acc, x) end)} end,
-      "==" => fn [left, right] -> {:ok, left == right} end,
-      "!=" => fn [left, right] -> {:ok, left != right} end,
-      "&&" => fn args -> {:ok, Enum.all?(args)} end,
-      "||" => fn args -> {:ok, Enum.any?(args)} end,
-      "!" => fn args -> {:ok, !Enum.at(args, 0)} end,
-      ">" => fn [left, right] -> {:ok, left > right} end,
-      ">=" => fn [left, right] -> {:ok, left >= right} end,
-      "<" => fn [left, right] -> {:ok, left < right} end,
-      "<=" => fn [left, right] -> {:ok, left <= right} end,
-      "<>" => fn args -> {:ok, Enum.join(args, "")} end,
-      "get" => fn [pid_string, key] ->
-        pid = pid_string |> String.to_charlist() |> :erlang.list_to_pid()
-        {:ok, GenServer.call(pid, {:get, key})}
-      end,
-      "set" => fn [pid_string, key, value] ->
-        pid = pid_string |> String.to_charlist() |> :erlang.list_to_pid()
-        {:ok, GenServer.cast(pid, {:set, key, value})}
-      end
-    }
+  def address do
+    Agent.get(__MODULE__, & &1)
   end
 
   def parse_command(json) do
@@ -77,5 +54,30 @@ defmodule Jel do
           arg
       end
     end)
+  end
+
+  defp commands do
+    %{
+      "+" => fn args -> {:ok, Enum.sum(args)} end,
+      "-" => fn args -> {:ok, Enum.reduce(args, fn x, acc -> acc - x end)} end,
+      "*" => fn args -> {:ok, Enum.reduce(args, fn x, acc -> acc * x end)} end,
+      "/" => fn args -> {:ok, Enum.reduce(args, fn x, acc -> div(acc, x) end)} end,
+      "==" => fn [left, right] -> {:ok, left == right} end,
+      "!=" => fn [left, right] -> {:ok, left != right} end,
+      "&&" => fn args -> {:ok, Enum.all?(args)} end,
+      "||" => fn args -> {:ok, Enum.any?(args)} end,
+      "!" => fn args -> {:ok, !Enum.at(args, 0)} end,
+      ">" => fn [left, right] -> {:ok, left > right} end,
+      ">=" => fn [left, right] -> {:ok, left >= right} end,
+      "<" => fn [left, right] -> {:ok, left < right} end,
+      "<=" => fn [left, right] -> {:ok, left <= right} end,
+      "<>" => fn args -> {:ok, Enum.join(args, "")} end,
+      "get" => fn [key] ->
+        {:ok, address() |> GenServer.call({:get, key})}
+      end,
+      "set" => fn [key, value] ->
+        {:ok, address() |> GenServer.cast({:set, key, value})}
+      end
+    }
   end
 end
