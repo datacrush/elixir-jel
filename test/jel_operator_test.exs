@@ -2,6 +2,12 @@ defmodule JelOperatorTest do
   use ExUnit.Case
   doctest Jel
 
+  setup do
+    {:ok, pid} = start_supervised(Jel)
+
+    {:ok, agent: pid}
+  end
+
   test "handles `+` operator" do
     {:ok, result} = Jel.eval(~s({"+": [ 2, 3, 4 ] }))
 
@@ -150,5 +156,16 @@ defmodule JelOperatorTest do
     {:error, result} = Jel.eval(~s({"@@": [ 2, 3, 4 ] }))
 
     assert result == "invalid operator"
+  end
+
+  test "handles `get` operator when no state manager provided" do
+    {:ok, result} = Jel.eval(~s({"get": [ "first_name" ] }))
+    assert result == nil
+  end
+
+  test "handles `set` operator when no state manager provided" do
+    Jel.eval(~s({"set": [ "first_name", "Jane" ] }))
+    {:ok, result} = Jel.eval(~s({"get": [ "first_name" ] }))
+    assert result == "Jane"
   end
 end

@@ -1,23 +1,31 @@
 defmodule Jel do
   use Agent
 
+  def start_link([]) do
+    Agent.start_link(fn -> %{_state: %{}} end, name: __MODULE__)
+  end
+
   def start_link([getter, setter]) do
-    # Agent.start_link(fn -> address end, name: __MODULE__)
     Agent.start_link(fn -> %{getter: getter, setter: setter} end,
       name: __MODULE__
     )
   end
 
-  # Use the custom getter function provided by the user to retrieve state
   def get(key) do
-    Agent.get(__MODULE__, fn state -> state.getter.(key) end)
+    Agent.get(__MODULE__, fn
+      %{getter: getter} -> getter.(key)
+      %{_state: state} -> Map.get(state, key)
+    end)
   end
 
-  # Use the custom setter function provided by the user to set state
   def set(key, value) do
-    Agent.update(__MODULE__, fn state ->
-      state.setter.(key, value)
-      state
+    Agent.update(__MODULE__, fn
+      state = %{setter: setter} ->
+        setter.(key, value)
+        state
+
+      state = %{_state: inner_state} ->
+        %{state | _state: Map.put(inner_state, key, value)}
     end)
   end
 
