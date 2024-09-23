@@ -3,7 +3,8 @@ defmodule JelStateTest do
 
   setup do
     {:ok, pid} = StateServer.start_link(%{"first_name" => "John", "last_name" => "Doe"})
-    {:ok, _} = start_supervised({Jel, pid})
+    {:ok, _} = start_supervised({Jel, [&StateServer.get/1, &StateServer.set/2]})
+
     {:ok, state_server: pid}
   end
 

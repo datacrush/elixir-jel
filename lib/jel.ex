@@ -1,12 +1,24 @@
 defmodule Jel do
   use Agent
 
-  def start_link(address) do
-    Agent.start_link(fn -> address end, name: __MODULE__)
+  def start_link([getter, setter]) do
+    # Agent.start_link(fn -> address end, name: __MODULE__)
+    Agent.start_link(fn -> %{getter: getter, setter: setter} end,
+      name: __MODULE__
+    )
   end
 
-  def address do
-    Agent.get(__MODULE__, & &1)
+  # Use the custom getter function provided by the user to retrieve state
+  def get(key) do
+    Agent.get(__MODULE__, fn state -> state.getter.(key) end)
+  end
+
+  # Use the custom setter function provided by the user to set state
+  def set(key, value) do
+    Agent.update(__MODULE__, fn state ->
+      state.setter.(key, value)
+      state
+    end)
   end
 
   def parse_command(json) do
@@ -73,10 +85,10 @@ defmodule Jel do
       "<=" => fn [left, right] -> {:ok, left <= right} end,
       "<>" => fn args -> {:ok, Enum.join(args, "")} end,
       "get" => fn [key] ->
-        {:ok, address() |> GenServer.call({:get, key})}
+        {:ok, get(key)}
       end,
       "set" => fn [key, value] ->
-        {:ok, address() |> GenServer.cast({:set, key, value})}
+        {:ok, set(key, value)}
       end
     }
   end
