@@ -65,6 +65,7 @@ defmodule JEL.Core do
           "*" -> op_mul(args, state, eval_fn)
           "/" -> op_div(args, state, eval_fn)
           "%" -> op_mod(args, state, eval_fn)
+          "?" -> op_if(args, state, eval_fn)
           _ -> dispatch_flavours(op, args, state, flavours, eval_fn)
         end
     end
@@ -285,6 +286,16 @@ defmodule JEL.Core do
   end
 
   defp op_mod(_other, _state, _eval_fn), do: nil
+
+  defp op_if([condition, then_expr, else_expr], state, eval_fn) do
+    if truthy?(eval_fn.(condition, state)) do
+      eval_fn.(then_expr, state)
+    else
+      eval_fn.(else_expr, state)
+    end
+  end
+
+  defp op_if(_other, _state, _eval_fn), do: nil
 
   # ================================================================
   # TRUTHINESS
