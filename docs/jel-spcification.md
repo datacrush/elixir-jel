@@ -1,4 +1,4 @@
-## ⭐ JEL Core v0.3 — Spec (with variadic operators)
+## ⭐ JEL Core v0.4 — Spec
 
 **Goal:** Tiny, portable, JSON-encoded expression language.
 **Host-agnostic. Domain-agnostic. Flavors sit on top.**
@@ -212,8 +212,8 @@ Allowed:
 
 - `+` (variadic)
 - `*` (variadic)
-- `-` (variadic, left fold, no identity)
-- `/` (variadic, left fold, no identity)
+- `-` (variadic, left fold)
+- `/` (variadic, left fold)
 - `%` (binary only)
 
 ##### `+` — sum (variadic)
@@ -242,7 +242,8 @@ Allowed:
 { "-": [expr1, expr2, ..., exprN] }
 ```
 
-- If `args` is empty or length 1 → `null`.
+- If `args` is empty → `null`.
+- Single arg → returns the value.
 - Evaluate first as initial accumulator.
 - Each remaining expr must be a number; otherwise → `null`.
 - Result: `((expr1 - expr2) - expr3) ...`.
@@ -253,7 +254,8 @@ Allowed:
 { "/": [expr1, expr2, ..., exprN] }
 ```
 
-- If `args` is empty or length 1 → `null`.
+- If `args` is empty → `null`.
+- Single arg → returns the value.
 - Evaluate first as initial accumulator.
 - Each remaining expr must be a number:
   - If any evaluated divisor is 0 → `null`.
@@ -275,9 +277,39 @@ Allowed:
 
 ---
 
+#### 5.4 Conditional Operator
+
+##### `?` — ternary if (fixed arity: 3)
+
+Shape:
+
+```json
+{ "?": [condition, then_expr, else_expr] }
+```
+
+Semantics:
+
+- Evaluate `condition`.
+- If truthy → evaluate and return `then_expr`.
+- If falsey → evaluate and return `else_expr`.
+- Short-circuit: only the taken branch is evaluated.
+- Wrong arity (not exactly 3 args) → `null`.
+
+Result type is whatever the taken branch evaluates to.
+
+Example:
+
+```json
+{ "?": [{ "||": [{ ">": [3, 4] }, { "==": [4, 4] }] }, "green", "orange"] }
+```
+
+Evaluates to `"green"`.
+
+---
+
 ### 6. Error / Invalid Cases
 
-- Unknown operator → `null`.
+- Unknown operator → passed to flavour chain; if no flavour handles it → `null`.
 - Wrong arity (except variadic ops as defined) → `null`.
 - Non-array arg list → `null`.
 - Type mismatches for arithmetic → `null`.
@@ -286,3 +318,46 @@ Allowed:
 - Comparison type mismatch → `false` (as per rules above).
 
 Interpreter implementations _must not throw_ for Core; they must collapse to `null`/`false` per above.
+
+---
+
+### 7. Flavours
+
+Flavours extend Core with domain-specific operators. They sit on top of Core and do not modify it.
+
+#### 7.1 Contract
+
+A flavour implements a single callback:
+
+```
+eval_op(op, args, state, eval_fn) -> result | :unknown
+```
+
+Where:
+
+- `op` — the operator string.
+- `args` — the **raw, unevaluated** argument expressions.
+- `state` — the same state passed to the top-level eval.
+- `eval_fn` — a function `(expr, state) -> scalar` that evaluates any sub-expression through the full chain (Core + all flavours). Flavours call this explicitly to evaluate their args.
+- Returns the scalar result, or `:unknown` to pass to the next flavour.
+
+#### 7.2 Chain Semantics
+
+Flavours are provided as an ordered list at eval time:
+
+```json
+eval(expression, state, flavours: [FlavourA, FlavourB])
+```
+
+- Core operators are always tried first.
+- For unknown operators, flavours are tried left-to-right.
+- First non-`:unknown` response wins.
+- If all flavours return `:unknown` → `null`.
+
+#### 7.3 Evaluation Control
+
+Flavour operators receive raw sub-expressions and must explicitly choose when to evaluate them via `eval_fn`. This allows flavour operators to:
+
+- Short-circuit (skip evaluation of some args).
+- Control evaluation order.
+- Compose with operators from other flavours in sub-expressions.
