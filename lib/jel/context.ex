@@ -2,6 +2,23 @@ defmodule Jel.Context do
   @moduledoc """
   Generates Anthropic-style tool schemas from registered flavours.
   Pass the result to your LLM as the `tools` parameter.
+
+  ## Usage
+
+      tools = Jel.Context.generate(flavours: [Jel.Flavour.File, Jel.Flavour.Git])
+
+      # Pass directly to the Anthropic API
+      Anthropic.messages(%{
+        model: "claude-opus-4-7",
+        tools: tools,
+        messages: [...]
+      })
+
+  ## Adding a flavour
+
+  Implement `Jel.Flavour` and pass it in the list:
+
+      tools = Jel.Context.generate(flavours: [Jel.Flavour.File, MyApp.JEL.Workflow])
   """
 
   def generate(opts \\ []) do
