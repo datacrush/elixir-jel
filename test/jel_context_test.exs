@@ -29,4 +29,27 @@ defmodule JelContextTest do
   test "returns empty list with no flavours" do
     assert Jel.Context.generate() == []
   end
+
+  test "filters operators with only whitelist" do
+    tools = Jel.Context.generate(flavours: [{Jel.Flavour.Git, only: ["git.log", "git.status"]}])
+    names = Enum.map(tools, & &1.name)
+    assert names == ["git.log", "git.status"]
+  end
+
+  test "plain module includes all operators" do
+    all     = Jel.Context.generate(flavours: [Jel.Flavour.Git])
+    filtered = Jel.Context.generate(flavours: [{Jel.Flavour.Git, only: ["git.log"]}])
+    assert length(all) > length(filtered)
+  end
+
+  test "mixes plain modules and filtered tuples" do
+    tools = Jel.Context.generate(flavours: [
+      {Jel.Flavour.File, only: ["file.tree"]},
+      Jel.Flavour.System
+    ])
+    names = Enum.map(tools, & &1.name)
+    assert "file.tree" in names
+    assert "cmd" in names
+    refute "file.grep" in names
+  end
 end

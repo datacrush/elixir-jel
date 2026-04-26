@@ -19,12 +19,32 @@ defmodule Jel.Context do
   Implement `Jel.Flavour` and pass it in the list:
 
       tools = Jel.Context.generate(flavours: [Jel.Flavour.File, MyApp.JEL.Workflow])
+
+  ## Restricting operators
+
+  Pass a `{module, only: [...]}` tuple to expose a subset of a flavour's operators:
+
+      tools = Jel.Context.generate(
+        flavours: [
+          {Jel.Flavour.File, only: ["file.tree", "file.grep", "file.context", "file.head"]},
+          {Jel.Flavour.Git,  only: ["git.log", "git.status"]},
+          Jel.Flavour.System
+        ]
+      )
   """
 
   def generate(opts \\ []) do
     flavours = Keyword.get(opts, :flavours, [])
-    Enum.flat_map(flavours, &to_tools(&1.describe()))
+    Enum.flat_map(flavours, &flavour_tools/1)
   end
+
+  defp flavour_tools({module, only: whitelist}) do
+    module.describe()
+    |> Enum.filter(&(&1.op in whitelist))
+    |> to_tools()
+  end
+
+  defp flavour_tools(module), do: to_tools(module.describe())
 
   defp to_tools(specs), do: Enum.map(specs, &to_tool/1)
 
