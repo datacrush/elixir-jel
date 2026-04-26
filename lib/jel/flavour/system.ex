@@ -1,0 +1,16 @@
+defmodule JEL.Flavour.System do
+  @behaviour JEL.Flavour
+
+  @impl JEL.Flavour
+  def eval_op("cmd", [cmd | args], state, eval_fn) do
+    command = eval_fn.(cmd, state)
+    arguments = Enum.map(args, fn arg -> eval_fn.(arg, state) |> to_string() end)
+
+    case System.cmd(command, arguments, stderr_to_stdout: true) do
+      {output, 0} -> String.trim(output)
+      _ -> nil
+    end
+  end
+
+  def eval_op(_op, _args, _state, _eval_fn), do: :unknown
+end

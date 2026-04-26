@@ -6,15 +6,17 @@ defmodule JEL.Core do
   - Variadic boolean and arithmetic operators
   - Binary comparisons
   - Scalar-only results: boolean | number | String.t() | nil
+  - Extensible via flavours
   """
 
   # ------------------------------------------------------------------
   # 1. Public entry point
   # ------------------------------------------------------------------
 
-  @spec eval(term(), map() | list()) :: boolean() | number() | String.t() | nil
-  def eval(expr, state) do
-    do_eval(expr, state)
+  @spec eval(term(), map() | list(), keyword()) :: boolean() | number() | String.t() | nil
+  def eval(expr, state, opts \\ []) do
+    flavours = Keyword.get(opts, :flavours, [])
+    do_eval(expr, state, flavours)
   rescue
     _ -> nil
   end
@@ -23,16 +25,16 @@ defmodule JEL.Core do
   # 2. Literal values
   # ------------------------------------------------------------------
 
-  defp do_eval(value, _state) when is_boolean(value), do: value
-  defp do_eval(value, _state) when is_number(value), do: value
-  defp do_eval(value, _state) when is_binary(value), do: value
-  defp do_eval(nil, _state), do: nil
+  defp do_eval(value, _state, _flavours) when is_boolean(value), do: value
+  defp do_eval(value, _state, _flavours) when is_number(value), do: value
+  defp do_eval(value, _state, _flavours) when is_binary(value), do: value
+  defp do_eval(nil, _state, _flavours), do: nil
 
   # ------------------------------------------------------------------
   # 3. Path lookup: %{ "get" => "a.b.c" }
   # ------------------------------------------------------------------
 
-  defp do_eval(%{"get" => path}, state) when is_binary(path) do
+  defp do_eval(%{"get" => path}, state, _flavours) when is_binary(path) do
     path
     |> String.split(".")
     |> resolve_path(state)
@@ -42,34 +44,46 @@ defmodule JEL.Core do
   # 4. Operator dispatch
   #    %{ "op" => [args...] }
   # ------------------------------------------------------------------
-  defp do_eval(map, state) when is_map(map) do
+
+  defp do_eval(map, state, flavours) when is_map(map) do
     case Map.to_list(map) do
       [{op, args}] when is_list(args) ->
+        eval_fn = fn e, s -> do_eval(e, s, flavours) end
+
         case op do
-          # Boolean
-          "&&" -> op_and(args, state)
-          "||" -> op_or(args, state)
-          "!" -> op_not(args, state)
-          # Comparison
-          "==" -> op_eq(args, state)
-          "!=" -> op_neq(args, state)
-          ">" -> op_gt(args, state)
-          ">=" -> op_gte(args, state)
-          "<" -> op_lt(args, state)
-          "<=" -> op_lte(args, state)
-          # Arithmetic
-          "+" -> op_add(args, state)
-          "-" -> op_sub(args, state)
-          "*" -> op_mul(args, state)
-          "/" -> op_div(args, state)
-          "%" -> op_mod(args, state)
-          _ -> nil
+          "&&" -> op_and(args, state, eval_fn)
+          "||" -> op_or(args, state, eval_fn)
+          "!" -> op_not(args, state, eval_fn)
+          "==" -> op_eq(args, state, eval_fn)
+          "!=" -> op_neq(args, state, eval_fn)
+          ">" -> op_gt(args, state, eval_fn)
+          ">=" -> op_gte(args, state, eval_fn)
+          "<" -> op_lt(args, state, eval_fn)
+          "<=" -> op_lte(args, state, eval_fn)
+          "+" -> op_add(args, state, eval_fn)
+          "-" -> op_sub(args, state, eval_fn)
+          "*" -> op_mul(args, state, eval_fn)
+          "/" -> op_div(args, state, eval_fn)
+          "%" -> op_mod(args, state, eval_fn)
+          _ -> dispatch_flavours(op, args, state, flavours, eval_fn)
         end
     end
   end
 
-  # Any other shape collapses to null
-  defp do_eval(_other, _state), do: nil
+  defp do_eval(_other, _state, _flavours), do: nil
+
+  # ------------------------------------------------------------------
+  # 5. Flavour chain
+  # ------------------------------------------------------------------
+
+  defp dispatch_flavours(_op, _args, _state, [], _eval_fn), do: nil
+
+  defp dispatch_flavours(op, args, state, [flavour | rest], eval_fn) do
+    case flavour.eval_op(op, args, state, eval_fn) do
+      :unknown -> dispatch_flavours(op, args, state, rest, eval_fn)
+      result -> result
+    end
+  end
 
   # ================================================================
   # PATH RESOLUTION
@@ -106,57 +120,54 @@ defmodule JEL.Core do
   # BOOLEAN OPERATORS (VARIADIC, SHORT-CIRCUIT)
   # ================================================================
 
-  # AND: identity = true, variadic
-  defp op_and(args, state) when is_list(args) do
+  defp op_and(args, state, eval_fn) when is_list(args) do
     case args do
       [] -> true
-      _ -> eval_and(args, state)
+      _ -> eval_and(args, state, eval_fn)
     end
   end
 
-  defp op_and(_other, _state), do: nil
+  defp op_and(_other, _state, _eval_fn), do: nil
 
-  defp eval_and([head | tail], state) do
-    if truthy?(do_eval(head, state)) do
-      eval_and(tail, state)
+  defp eval_and([head | tail], state, eval_fn) do
+    if truthy?(eval_fn.(head, state)) do
+      eval_and(tail, state, eval_fn)
     else
       false
     end
   end
 
-  defp eval_and([], _state), do: true
+  defp eval_and([], _state, _eval_fn), do: true
 
-  # OR: identity = false, variadic
-  defp op_or(args, state) when is_list(args) do
+  defp op_or(args, state, eval_fn) when is_list(args) do
     case args do
       [] -> false
-      _ -> eval_or(args, state)
+      _ -> eval_or(args, state, eval_fn)
     end
   end
 
-  defp op_or(_other, _state), do: nil
+  defp op_or(_other, _state, _eval_fn), do: nil
 
-  defp eval_or([head | tail], state) do
-    if truthy?(do_eval(head, state)) do
+  defp eval_or([head | tail], state, eval_fn) do
+    if truthy?(eval_fn.(head, state)) do
       true
     else
-      eval_or(tail, state)
+      eval_or(tail, state, eval_fn)
     end
   end
 
-  defp eval_or([], _state), do: false
+  defp eval_or([], _state, _eval_fn), do: false
 
-  # NOT: unary only
-  defp op_not([expr], state), do: not truthy?(do_eval(expr, state))
-  defp op_not(_other, _state), do: nil
+  defp op_not([expr], state, eval_fn), do: not truthy?(eval_fn.(expr, state))
+  defp op_not(_other, _state, _eval_fn), do: nil
 
   # ================================================================
   # COMPARISON OPERATORS (BINARY ONLY)
   # ================================================================
 
-  defp op_eq([a, b], state) do
-    av = do_eval(a, state)
-    bv = do_eval(b, state)
+  defp op_eq([a, b], state, eval_fn) do
+    av = eval_fn.(a, state)
+    bv = eval_fn.(b, state)
 
     cond do
       is_number(av) and is_number(bv) -> av == bv
@@ -167,31 +178,30 @@ defmodule JEL.Core do
     end
   end
 
-  defp op_eq(_other, _state), do: nil
+  defp op_eq(_other, _state, _eval_fn), do: nil
 
-  defp op_neq(args, state) do
-    case op_eq(args, state) do
+  defp op_neq(args, state, eval_fn) do
+    case op_eq(args, state, eval_fn) do
       nil -> nil
       bool when is_boolean(bool) -> not bool
     end
   end
 
-  # Ordering: numbers only, type mismatch => false
-  defp op_gt([a, b], state), do: compare_numbers(a, b, state, &Kernel.>/2)
-  defp op_gt(_other, _state), do: nil
+  defp op_gt([a, b], state, eval_fn), do: compare_numbers(a, b, state, eval_fn, &Kernel.>/2)
+  defp op_gt(_other, _state, _eval_fn), do: nil
 
-  defp op_gte([a, b], state), do: compare_numbers(a, b, state, &Kernel.>=/2)
-  defp op_gte(_other, _state), do: nil
+  defp op_gte([a, b], state, eval_fn), do: compare_numbers(a, b, state, eval_fn, &Kernel.>=/2)
+  defp op_gte(_other, _state, _eval_fn), do: nil
 
-  defp op_lt([a, b], state), do: compare_numbers(a, b, state, &Kernel.</2)
-  defp op_lt(_other, _state), do: nil
+  defp op_lt([a, b], state, eval_fn), do: compare_numbers(a, b, state, eval_fn, &Kernel.</2)
+  defp op_lt(_other, _state, _eval_fn), do: nil
 
-  defp op_lte([a, b], state), do: compare_numbers(a, b, state, &Kernel.<=/2)
-  defp op_lte(_other, _state), do: nil
+  defp op_lte([a, b], state, eval_fn), do: compare_numbers(a, b, state, eval_fn, &Kernel.<=/2)
+  defp op_lte(_other, _state, _eval_fn), do: nil
 
-  defp compare_numbers(a, b, state, fun) do
-    av = do_eval(a, state)
-    bv = do_eval(b, state)
+  defp compare_numbers(a, b, state, eval_fn, fun) do
+    av = eval_fn.(a, state)
+    bv = eval_fn.(b, state)
 
     if is_number(av) and is_number(bv) do
       fun.(av, bv)
@@ -204,36 +214,33 @@ defmodule JEL.Core do
   # ARITHMETIC OPERATORS (VARIADIC WHERE IT MAKES SENSE)
   # ================================================================
 
-  # + : sum, identity 0
-  defp op_add(args, state) when is_list(args) do
+  defp op_add(args, state, eval_fn) when is_list(args) do
     Enum.reduce_while(args, 0, fn expr, acc ->
-      case do_eval(expr, state) do
+      case eval_fn.(expr, state) do
         v when is_number(v) -> {:cont, acc + v}
         _ -> {:halt, nil}
       end
     end)
   end
 
-  defp op_add(_other, _state), do: nil
+  defp op_add(_other, _state, _eval_fn), do: nil
 
-  # * : product, identity 1
-  defp op_mul(args, state) when is_list(args) do
+  defp op_mul(args, state, eval_fn) when is_list(args) do
     Enum.reduce_while(args, 1, fn expr, acc ->
-      case do_eval(expr, state) do
+      case eval_fn.(expr, state) do
         v when is_number(v) -> {:cont, acc * v}
         _ -> {:halt, nil}
       end
     end)
   end
 
-  defp op_mul(_other, _state), do: nil
+  defp op_mul(_other, _state, _eval_fn), do: nil
 
-  # - : variadic left-fold, no identity
-  defp op_sub([first | rest], state) do
-    case do_eval(first, state) do
+  defp op_sub([first | rest], state, eval_fn) do
+    case eval_fn.(first, state) do
       v when is_number(v) ->
         Enum.reduce_while(rest, v, fn expr, acc ->
-          case do_eval(expr, state) do
+          case eval_fn.(expr, state) do
             x when is_number(x) -> {:cont, acc - x}
             _ -> {:halt, nil}
           end
@@ -244,14 +251,13 @@ defmodule JEL.Core do
     end
   end
 
-  defp op_sub(_other, _state), do: nil
+  defp op_sub(_other, _state, _eval_fn), do: nil
 
-  # / : variadic left-fold, no identity, division by zero => nil
-  defp op_div([first | rest], state) do
-    case do_eval(first, state) do
+  defp op_div([first | rest], state, eval_fn) do
+    case eval_fn.(first, state) do
       v when is_number(v) ->
         Enum.reduce_while(rest, v, fn expr, acc ->
-          case do_eval(expr, state) do
+          case eval_fn.(expr, state) do
             0 -> {:halt, nil}
             x when is_number(x) -> {:cont, acc / x}
             _ -> {:halt, nil}
@@ -263,12 +269,11 @@ defmodule JEL.Core do
     end
   end
 
-  defp op_div(_other, _state), do: nil
+  defp op_div(_other, _state, _eval_fn), do: nil
 
-  # % : binary modulo only
-  defp op_mod([a, b], state) do
-    av = do_eval(a, state)
-    bv = do_eval(b, state)
+  defp op_mod([a, b], state, eval_fn) do
+    av = eval_fn.(a, state)
+    bv = eval_fn.(b, state)
 
     cond do
       is_number(av) and is_number(bv) and bv != 0 ->
@@ -279,7 +284,7 @@ defmodule JEL.Core do
     end
   end
 
-  defp op_mod(_other, _state), do: nil
+  defp op_mod(_other, _state, _eval_fn), do: nil
 
   # ================================================================
   # TRUTHINESS

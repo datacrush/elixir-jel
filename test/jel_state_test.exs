@@ -1,23 +1,30 @@
 defmodule JelStateTest do
   use ExUnit.Case
 
-  setup do
-    {:ok, pid} = StateServer.start_link(%{"first_name" => "John", "last_name" => "Doe"})
-    {:ok, _} = start_supervised({Jel, [&StateServer.get/1, &StateServer.set/2]})
+  @state %{"first_name" => "John", "last_name" => "Doe", "address" => %{"city" => "NYC"}}
 
-    {:ok, state_server: pid}
-  end
-
-  test "handles `get` operator" do
-    {:ok, result} = Jel.eval("{ \"get\": [ \"first_name\" ] }")
-
+  test "handles flat path lookup" do
+    {:ok, result} = Jel.eval(~s({"get": "first_name"}), @state)
     assert result == "John"
   end
 
-  test "handles `set` operator" do
-    Jel.eval("{ \"set\": [ \"first_name\", \"Jane\" ] }")
-    {:ok, result} = Jel.eval("{ \"get\": [ \"first_name\" ] }")
+  test "handles nested path lookup" do
+    {:ok, result} = Jel.eval(~s({"get": "address.city"}), @state)
+    assert result == "NYC"
+  end
 
-    assert result == "Jane"
+  test "returns nil for missing key" do
+    {:ok, result} = Jel.eval(~s({"get": "missing"}), @state)
+    assert result == nil
+  end
+
+  test "returns nil for missing nested key" do
+    {:ok, result} = Jel.eval(~s({"get": "address.zip"}), @state)
+    assert result == nil
+  end
+
+  test "handles path lookup in expression" do
+    {:ok, result} = Jel.eval(~s({"==": [{"get": "first_name"}, "John"]}), @state)
+    assert result == true
   end
 end
