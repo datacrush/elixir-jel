@@ -77,4 +77,83 @@ defmodule Jel.Flavour.Git do
 
   defp as_result(""), do: nil
   defp as_result(str), do: str
+
+  @impl Jel.Flavour
+  def describe do
+    [
+      %{
+        op: "git.log",
+        description: "Show recent commits (like git log --oneline)",
+        params: [
+          %{name: "n", type: "number", description: "Number of commits to return", required: true},
+          %{name: "path", type: "string", description: "Limit to commits touching this file", required: false}
+        ],
+        returns: "commit hashes and messages, one per line, or null if no history"
+      },
+      %{
+        op: "git.diff",
+        description: "Show changes between refs or between a ref and the working tree (like git diff)",
+        params: [
+          %{name: "ref1", type: "string", description: "Base ref or commit hash", required: true},
+          %{name: "ref2", type: "string", description: "Target ref — omit to diff against working tree", required: false}
+        ],
+        returns: "unified diff as a string, or null on error"
+      },
+      %{
+        op: "git.blame",
+        description: "Show who last modified each line in a range (like git blame -L)",
+        params: [
+          %{name: "path", type: "string", description: "File path", required: true},
+          %{name: "line", type: "number", description: "Target line number", required: true},
+          %{name: "context", type: "number", description: "Number of lines before and after", required: true}
+        ],
+        returns: "annotated lines showing commit hash, author, and content"
+      },
+      %{
+        op: "git.show",
+        description: "Show full details of a commit including its diff (like git show)",
+        params: [
+          %{name: "ref", type: "string", description: "Commit hash or ref e.g. HEAD", required: true}
+        ],
+        returns: "commit metadata and diff as a string, or null if ref not found"
+      },
+      %{
+        op: "git.status",
+        description: "Show the working tree status (like git status)",
+        params: [],
+        returns: "current branch, staged and unstaged changes as a string"
+      },
+      %{
+        op: "git.branches",
+        description: "List all local and remote branches (like git branch -a)",
+        params: [],
+        returns: "branch names one per line, current branch prefixed with *"
+      },
+      %{
+        op: "git.checkout",
+        description: "Switch to a branch, or create and switch to a new one (like git checkout or git checkout -b)",
+        params: [
+          %{name: "branch", type: "string", description: "Branch name", required: true},
+          %{name: "create", type: "boolean", description: "Pass true to create the branch if it does not exist", required: false}
+        ],
+        returns: "git output on success, or null on failure"
+      },
+      %{
+        op: "git.add",
+        description: "Stage a file for commit (like git add)",
+        params: [
+          %{name: "path", type: "string", description: "File path to stage", required: true}
+        ],
+        returns: "git output on success, or null on failure"
+      },
+      %{
+        op: "git.commit",
+        description: "Commit staged changes with a message (like git commit -m)",
+        params: [
+          %{name: "message", type: "string", description: "Commit message", required: true}
+        ],
+        returns: "git output on success, or null on failure"
+      }
+    ]
+  end
 end

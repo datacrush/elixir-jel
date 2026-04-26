@@ -91,4 +91,65 @@ defmodule Jel.Flavour.File do
 
   defp as_result(""), do: nil
   defp as_result(str), do: str
+
+  @impl Jel.Flavour
+  def describe do
+    [
+      %{
+        op: "file.tree",
+        description: "List all files under a path (like find path -type f)",
+        params: [
+          %{name: "path", type: "string", description: "Directory to list", required: true}
+        ],
+        returns: "newline-separated file paths sorted alphabetically, or null if path not found"
+      },
+      %{
+        op: "file.grep",
+        description: "Search for a pattern in files recursively (like grep -rn)",
+        params: [
+          %{name: "pattern", type: "string", description: "Search pattern", required: true},
+          %{name: "path", type: "string", description: "Directory to search", required: true},
+          %{name: "filter", type: "string", description: "File extension filter e.g. *.ex", required: false}
+        ],
+        returns: "matching lines as file:line:content format, or null if no matches"
+      },
+      %{
+        op: "file.context",
+        description: "Read lines around a specific line number in a file (like awk NR>=from && NR<=to)",
+        params: [
+          %{name: "path", type: "string", description: "File path", required: true},
+          %{name: "line", type: "number", description: "Target line number", required: true},
+          %{name: "context", type: "number", description: "Number of lines to include before and after", required: true}
+        ],
+        returns: "lines prefixed with line numbers, or null if file not found"
+      },
+      %{
+        op: "file.head",
+        description: "Read the first n lines of a file (like head -n)",
+        params: [
+          %{name: "path", type: "string", description: "File path", required: true},
+          %{name: "n", type: "number", description: "Number of lines to return", required: true}
+        ],
+        returns: "first n lines as a string, or null if file not found"
+      },
+      %{
+        op: "file.write",
+        description: "Write content to a file, creating or overwriting it",
+        params: [
+          %{name: "path", type: "string", description: "File path", required: true},
+          %{name: "content", type: "string", description: "Content to write", required: true}
+        ],
+        returns: "the file path on success, or null on failure"
+      },
+      %{
+        op: "file.patch",
+        description: "Apply a unified diff to a file (like patch)",
+        params: [
+          %{name: "path", type: "string", description: "File path to patch", required: true},
+          %{name: "diff", type: "string", description: "Unified diff string", required: true}
+        ],
+        returns: "the file path on success, or null if the patch fails"
+      }
+    ]
+  end
 end

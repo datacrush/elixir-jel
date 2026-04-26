@@ -10,6 +10,9 @@ defmodule JelFlavourTest do
     end
 
     def eval_op(_op, _args, _state, _eval_fn), do: :unknown
+
+    @impl Jel.Flavour
+    def describe, do: []
   end
 
   test "flavour operator resolves" do
