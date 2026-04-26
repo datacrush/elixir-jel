@@ -2,9 +2,9 @@ defmodule JelFlavourTest do
   use ExUnit.Case
 
   defmodule Greet do
-    @behaviour JEL.Flavour
+    @behaviour Jel.Flavour
 
-    @impl JEL.Flavour
+    @impl Jel.Flavour
     def eval_op("greet", [name_expr], state, eval_fn) do
       "Hello, #{eval_fn.(name_expr, state)}!"
     end

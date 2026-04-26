@@ -1,7 +1,7 @@
-defmodule JEL.Flavour.System do
-  @behaviour JEL.Flavour
+defmodule Jel.Flavour.System do
+  @behaviour Jel.Flavour
 
-  @impl JEL.Flavour
+  @impl Jel.Flavour
   def eval_op("cmd", [cmd | args], state, eval_fn) do
     command = eval_fn.(cmd, state)
     arguments = Enum.map(args, fn arg -> eval_fn.(arg, state) |> to_string() end)

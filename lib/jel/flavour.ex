@@ -1,4 +1,4 @@
-defmodule JEL.Flavour do
+defmodule Jel.Flavour do
   @callback eval_op(
               op :: String.t(),
               args :: list(),

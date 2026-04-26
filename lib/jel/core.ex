@@ -1,4 +1,4 @@
-defmodule JEL.Core do
+defmodule Jel.Core do
   @moduledoc """
   JEL Core v0.3 interpreter (Elixir).
 
