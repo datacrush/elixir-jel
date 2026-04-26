@@ -53,6 +53,33 @@ defmodule Jel.Flavour.File do
     end
   end
 
+  def eval_op("file.write", [path_expr, content_expr], state, eval_fn) do
+    path    = eval_fn.(path_expr, state)
+    content = eval_fn.(content_expr, state)
+
+    case File.write(path, content) do
+      :ok    -> path
+      _      -> nil
+    end
+  end
+
+  def eval_op("file.patch", [path_expr, diff_expr], state, eval_fn) do
+    path = eval_fn.(path_expr, state)
+    diff = eval_fn.(diff_expr, state)
+    tmp  = Path.join(System.tmp_dir!(), "jel_patch_#{:erlang.unique_integer([:positive])}.diff")
+
+    result =
+      with :ok <- File.write(tmp, diff),
+           {_, 0} <- System.cmd("patch", [path, tmp], stderr_to_stdout: true) do
+        path
+      else
+        _ -> nil
+      end
+
+    File.rm(tmp)
+    result
+  end
+
   def eval_op(_op, _args, _state, _eval_fn), do: :unknown
 
   defp grep(args) do
