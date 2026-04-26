@@ -28,4 +28,10 @@ defmodule JelFlavourGitTest do
     {:ok, result} = Jel.eval(~s({"git.blame": ["lib/jel/core.ex", 1, 3]}), %{}, @opts)
     assert is_binary(result)
   end
+
+  test "git.status returns working tree state" do
+    {:ok, result} = Jel.eval(~s({"git.status": []}), %{}, @opts)
+    assert is_binary(result)
+    assert result =~ "On branch"
+  end
 end

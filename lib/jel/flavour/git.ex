@@ -38,6 +38,10 @@ defmodule Jel.Flavour.Git do
     git(["show", ref])
   end
 
+  def eval_op("git.status", [], _state, _eval_fn) do
+    git(["status"])
+  end
+
   def eval_op(_op, _args, _state, _eval_fn), do: :unknown
 
   defp git(args) do
