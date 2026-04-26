@@ -42,6 +42,30 @@ defmodule Jel.Flavour.Git do
     git(["status"])
   end
 
+  def eval_op("git.branches", [], _state, _eval_fn) do
+    git(["branch", "-a"])
+  end
+
+  def eval_op("git.checkout", [branch_expr], state, eval_fn) do
+    branch = eval_fn.(branch_expr, state)
+    git(["checkout", branch])
+  end
+
+  def eval_op("git.checkout", [branch_expr, true], state, eval_fn) do
+    branch = eval_fn.(branch_expr, state)
+    git(["checkout", "-b", branch])
+  end
+
+  def eval_op("git.add", [path_expr], state, eval_fn) do
+    path = eval_fn.(path_expr, state)
+    git(["add", path])
+  end
+
+  def eval_op("git.commit", [message_expr], state, eval_fn) do
+    message = eval_fn.(message_expr, state)
+    git(["commit", "-m", message])
+  end
+
   def eval_op(_op, _args, _state, _eval_fn), do: :unknown
 
   defp git(args) do

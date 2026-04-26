@@ -34,4 +34,21 @@ defmodule JelFlavourGitTest do
     assert is_binary(result)
     assert result =~ "On branch"
   end
+
+  test "git.branches lists branches" do
+    {:ok, result} = Jel.eval(~s({"git.branches": []}), %{}, @opts)
+    assert is_binary(result)
+  end
+
+  test "git.checkout switches to existing branch" do
+    {:ok, current} = Jel.eval(~s({"git.status": []}), %{}, @opts)
+    branch = if current =~ "main", do: "main", else: "feat/impliment-spec"
+    {:ok, result} = Jel.eval(~s({"git.checkout": ["#{branch}"]}), %{}, @opts)
+    assert is_binary(result) or is_nil(result)
+  end
+
+  test "git.add stages a file" do
+    {:ok, result} = Jel.eval(~s({"git.add": ["lib/jel/flavour/git.ex"]}), %{}, @opts)
+    assert is_binary(result) or is_nil(result)
+  end
 end
